@@ -49,8 +49,8 @@ package() {
 	install -Dm644 "${srcdir}/hifi.conf" "${pkgdir}/usr/share/alsa/ucm2/Qualcomm/sm8250/HiFi_pipa.conf"
 
 	# /usr/share/wireplumber.conf.d/51-pipa.conf
-	mkdir -p "${pkgdir}/usr/share/wireplumber.conf.d/51-pipa.conf"
-	install -Dm644 "${srcdir}/wireplumber.conf" "${pkgdir}/usr/share/wireplumber.conf.d/51-pipa.conf"	
+	mkdir -p "${pkgdir}/usr/share/wireplumber/wireplumber.conf.d"
+	install -Dm644 "${srcdir}/wireplumber.conf" "${pkgdir}/usr/share/wireplumber/wireplumber.conf.d/51-pipa.conf"	
 }
 
 
