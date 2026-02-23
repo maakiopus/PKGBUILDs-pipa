@@ -1,0 +1,30 @@
+#!/bin/sh
+
+post_install() {
+    # Reload all systemd unit files
+    systemctl daemon-reload
+    
+    # Enable the systemd services
+    systemctl enable swclock-offset-boot
+    systemctl enable swclock-offset-shutdown
+}
+
+pre_remove() {
+    # Restore the original state
+    systemctl disable --now swclock-offset-boot
+    systemctl disable --now swclock-offset-shutdown
+}
+
+post_remove() {
+    # Remove offset file and directory
+    offset_file="/var/cache/swclock-offset/offset-storage"
+    offset_directory="/var/cache/swclock-offset"
+
+    if [ -f $offset_file ]; then
+    rm $offset_file
+    fi
+
+    if [ -d $offset_directory ]; then
+    rmdir $offset_directory
+    fi
+}
