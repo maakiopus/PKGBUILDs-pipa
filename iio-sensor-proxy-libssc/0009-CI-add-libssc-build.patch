@@ -1,0 +1,47 @@
+From 97d0574ee2367dc2eb1745f2c80709af8b929bb9 Mon Sep 17 00:00:00 2001
+From: Dylan Van Assche <me@dylanvanassche.be>
+Date: Fri, 24 May 2024 21:00:25 +0200
+Subject: [PATCH 09/10] CI: add libssc build
+
+libssc support is behind a meson build flag which is disabled by default,
+add a separate build to CI.
+---
+ .gitlab-ci.yml | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+
+diff --git a/.gitlab-ci.yml b/.gitlab-ci.yml
+index f404c7a..e675640 100644
+--- a/.gitlab-ci.yml
++++ b/.gitlab-ci.yml
+@@ -41,6 +41,28 @@ build-debian-trixie:
+       - "${CI_PROJECT_DIR}/_build/meson-dist"
+       - "${CI_PROJECT_DIR}/_build/docs/html/"
+ 
++build-debian-trixie-libssc:
++  before_script:
++    - apt-get update
++    - apt-get -y install eatmydata
++    - eatmydata apt-get -y install $DEPENDENCIES
++    - eatmydata apt-get -y install python3 python-is-python3 python3-dev qrtr-tools libprotobuf-c-dev libprotobuf-dev protobuf-c-compiler protobuf-compiler python3-gi libmbim-glib-dev libqmi-glib-dev python3-protobuf libqrtr1
++    - git clone "https://codeberg.org/DylanVanAssche/libssc.git"
++    - cd libssc
++    - mkdir _build
++    - meson setup _build
++    - meson compile --verbose -C _build
++    - meson install --no-rebuild -C _build
++    - cd mocking
++    - ./ssc-server &
++    - cd ../..
++  script:
++    - meson -Dssc-support=enabled -Dtests=true -Dgtk_doc=true -Dgtk-tests=true _build
++    - meson compile --verbose -C _build
++    - meson install -C _build
++    - meson dist -C _build
++    - meson test --verbose -C _build
++
+ pages:
+   needs:
+     - build-debian-trixie
+-- 
+2.52.0
+

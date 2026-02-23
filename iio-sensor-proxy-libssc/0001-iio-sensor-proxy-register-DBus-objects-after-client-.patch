@@ -1,0 +1,137 @@
+From a50ddc5ece80fc39dd71adacebff69462e7abf50 Mon Sep 17 00:00:00 2001
+From: Dylan Van Assche <git@dylanvanassche.be>
+Date: Mon, 9 Feb 2026 13:44:08 +0100
+Subject: [PATCH] iio-sensor-proxy: register DBus objects after client
+ hashtable init
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+`g_bus_own_name` has several callbacks which are invoked in a specific order [1],
+`bus_acquired` callback is invoked before `name_acquired` callback.
+
+iio-sensor-proxy creates hash tables per sensor to keep track of clients
+in the `name_acquired` callback and exposes the DBus objects
+in the `bus_acquired` callback.
+
+This leads to a race condition when a DBus client is fast enough to register
+and deregister at boot causing a crash as the client hash tables are not
+created yet but the DBus objects are already exposed. If the client vanishes
+too quickly, the hashtable is accessed which does not exist yet.
+
+Move the DBus object registration to the `name_acquired` callback after
+the hashtables are initialized to avoid this race condition.
+
+[1] https://docs.gtk.org/gio/func.bus_own_name.html
+
+Logs:
+
+Jan 26 15:21:16 sargo iio-sensor-proxy[1074]: g_hash_table_lookup: assertion 'hash_table != NULL' failed
+Jan 26 15:21:16 sargo iio-sensor-proxy[1074]: g_hash_table_insert_internal: assertion 'hash_table != NULL' failed
+Jan 26 15:21:26 sargo iio-sensor-proxy[1074]: g_hash_table_lookup: assertion 'hash_table != NULL' failed
+Jan 26 15:21:27 sargo iio-sensor-proxy[1074]: g_hash_table_lookup: assertion 'hash_table != NULL' failed
+Jan 26 15:21:28 sargo iio-sensor-proxy[1074]: **
+Jan 26 15:21:28 sargo iio-sensor-proxy[1074]: ERROR:../src/iio-sensor-proxy.c:452:client_vanished_cb: assertion failed: (ht)
+Jan 26 15:21:28 sargo iio-sensor-proxy[1074]: Bail out! ERROR:../src/iio-sensor-proxy.c:452:client_vanished_cb: assertion failed: (ht)
+Jan 26 15:21:28 sargo systemd-coredump[3361]: [🡕] Process 1074 (iio-sensor-prox) of user 0 dumped core.
+
+                                              Stack trace of thread 1074:
+                                              #0  0x0000ffffa9b91cd8 n/a (n/a + 0x0)
+                                              #1  0x0000ffffa9b91e6c n/a (n/a + 0x0)
+                                              #2  0x0000ffffa9b60628 n/a (n/a + 0x0)
+                                              #3  0x0000ffffa9716838 n/a (n/a + 0x0)
+                                              #4  0x0000ffffa97168a0 n/a (n/a + 0x0)
+                                              #5  0x0000aaaae8bd5248 n/a (n/a + 0x0)
+                                              #6  0x0000ffffa9929734 n/a (n/a + 0x0)
+                                              #7  0x0000ffffa99298dc n/a (n/a + 0x0)
+                                              #8  0x0000ffffa99162f0 n/a (n/a + 0x0)
+                                              #9  0x0000ffffa96e4eac n/a (n/a + 0x0)
+                                              #10 0x0000ffffa96e8794 n/a (n/a + 0x0)
+                                              #11 0x0000ffffa96e92b0 n/a (n/a + 0x0)
+                                              #12 0x0000ffffa9a64488 n/a (n/a + 0x0)
+                                              #13 0x0000aaaae8bdb3d0 n/a (n/a + 0x0)
+                                              #14 0x0000aaaae8bd923c n/a (n/a + 0x0)
+                                              #15 0x0000aaaae8bd987c n/a (n/a + 0x0)
+                                              #16 0x0000ffffa992816c n/a (n/a + 0x0)
+                                              #17 0x0000ffffa99283c0 n/a (n/a + 0x0)
+                                              #18 0x0000ffffa99162f0 n/a (n/a + 0x0)
+                                              #19 0x0000ffffa96e4eac n/a (n/a + 0x0)
+                                              #20 0x0000ffffa96e8794 n/a (n/a + 0x0)
+                                              #21 0x0000ffffa96e92b0 n/a (n/a + 0x0)
+                                              #22 0x0000aaaae8bd40b4 n/a (n/a + 0x0)
+                                              #23 0x0000ffffa9b5ff9c n/a (n/a + 0x0)
+                                              ELF object binary architecture: AARCH64
+Jan 26 15:21:28 sargo systemd[1]: iio-sensor-proxy.service: Main process exited, code=dumped, status=6/ABRT
+Jan 26 15:21:28 sargo systemd[1]: iio-sensor-proxy.service: Failed with result 'core-dump'.
+---
+ src/iio-sensor-proxy.c | 31 ++++++++++++++++++-------------
+ 1 file changed, 18 insertions(+), 13 deletions(-)
+
+diff --git a/src/iio-sensor-proxy.c b/src/iio-sensor-proxy.c
+index c204b5c..641b27c 100644
+--- a/src/iio-sensor-proxy.c
++++ b/src/iio-sensor-proxy.c
+@@ -712,6 +712,16 @@ bus_acquired_handler (GDBusConnection *connection,
+ 		      gpointer         user_data)
+ {
+ 	SensorData *data = user_data;
++	const gchar * const subsystems[] = {
++		"iio",
++		"input",
++		"platform",
++#ifdef HAS_LIBSSC
++		"misc",
++#endif
++		NULL
++    };
++	guint i;
+ 
+ 	g_dbus_connection_register_object (connection,
+ 					   SENSOR_PROXY_DBUS_PATH,
+@@ -729,6 +739,14 @@ bus_acquired_handler (GDBusConnection *connection,
+ 					   NULL,
+ 					   NULL);
+ 
++	/* Initialize data structures before DBus is fully exposed */
++	data->client = g_udev_client_new (subsystems);
++
++	for (i = 0; i < NUM_SENSOR_TYPES; i++) {
++		data->clients[i] = create_clients_hash_table ();
++		data->sensor_startup_dbus_invocations_delayed[i] = g_ptr_array_new ();
++	}
++
+ 	data->connection = g_object_ref (connection);
+ }
+ 
+@@ -738,18 +756,8 @@ name_acquired_handler (GDBusConnection *connection,
+ 		       gpointer         user_data)
+ {
+ 	SensorData *data = user_data;
+-	const gchar * const subsystems[] = {
+-		"iio",
+-		"input",
+-		"platform",
+-#ifdef HAS_LIBSSC
+-		"misc",
+-#endif
+-		NULL
+-    };
+ 	guint i;
+ 
+-	data->client = g_udev_client_new (subsystems);
+ 	if (!find_sensors (data->client, data))
+ 		goto bail;
+ 
+@@ -759,9 +767,6 @@ name_acquired_handler (GDBusConnection *connection,
+ 	for (i = 0; i < NUM_SENSOR_TYPES; i++) {
+ 		SensorDevice *sensor_device;
+ 
+-		data->clients[i] = create_clients_hash_table ();
+-		data->sensor_startup_dbus_invocations_delayed[i] = g_ptr_array_new ();
+-
+ 		if (!driver_type_exists (data, i))
+ 			continue;
+ 
+-- 
+2.53.0
+

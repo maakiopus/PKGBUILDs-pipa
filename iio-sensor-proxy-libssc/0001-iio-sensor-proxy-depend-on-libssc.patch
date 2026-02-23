@@ -1,0 +1,134 @@
+From 1a371ad43c0ceee28c275d23b864390f9453322f Mon Sep 17 00:00:00 2001
+From: Dylan Van Assche <me@dylanvanassche.be>
+Date: Sun, 23 Apr 2023 16:54:10 +0200
+Subject: [PATCH 01/10] iio-sensor-proxy: depend on libssc
+
+Add libssc library to iio-sensor-proxy and discover FastRPC
+devices as possible subsystems for sensors. The presence of
+FastRPC devices indicate the support for Qualcomm Snapdragon Sensor
+Core (SSC).
+---
+ data/80-iio-sensor-proxy.rules |  6 ++++++
+ data/meson.build               |  4 ++++
+ meson.build                    |  1 +
+ meson_options.txt              |  4 ++++
+ src/iio-sensor-proxy.c         | 15 ++++++++++++++-
+ src/meson.build                |  7 +++++++
+ 6 files changed, 36 insertions(+), 1 deletion(-)
+
+diff --git a/data/80-iio-sensor-proxy.rules b/data/80-iio-sensor-proxy.rules
+index 8389697..0436cd5 100644
+--- a/data/80-iio-sensor-proxy.rules
++++ b/data/80-iio-sensor-proxy.rules
+@@ -18,6 +18,12 @@ SUBSYSTEM=="iio", TEST=="in_proximity_raw", ENV{IIO_SENSOR_PROXY_TYPE}+="iio-pol
+ SUBSYSTEM=="iio", TEST=="in_proximity0_raw", ENV{IIO_SENSOR_PROXY_TYPE}+="iio-poll-proximity"
+ SUBSYSTEM=="input", ENV{ID_INPUT_ACCELEROMETER}=="1", ENV{IIO_SENSOR_PROXY_TYPE}+="input-accel"
+ 
++# Set the sensor type for all the types we recognise for SDSP/ADSP with libssc.
++# Some devices expose the sensors via a separate SDSP while others re-use ADSP.
++# These DSPs expose itself as /dev/fastrpc-* in the misc subsystem.
++SUBSYSTEM=="misc", KERNEL=="fastrpc-adsp*", ENV{IIO_SENSOR_PROXY_TYPE}+="ssc-accel ssc-light ssc-proximity ssc-compass"
++SUBSYSTEM=="misc", KERNEL=="fastrpc-sdsp*", ENV{IIO_SENSOR_PROXY_TYPE}+="ssc-accel ssc-light ssc-proximity ssc-compass"
++
+ ENV{IIO_SENSOR_PROXY_TYPE}=="", GOTO="iio_sensor_proxy_end"
+ 
+ # We got here because we have a sensor type, which means we need the service
+diff --git a/data/meson.build b/data/meson.build
+index 97dbc07..49eb3e2 100644
+--- a/data/meson.build
++++ b/data/meson.build
+@@ -1,3 +1,7 @@
++rules = files(
++  '80-iio-sensor-proxy.rules'
++)
++
+ install_data(
+   '80-iio-sensor-proxy.rules',
+   install_dir: udev_rules_dir
+diff --git a/meson.build b/meson.build
+index 2a31b12..7984575 100644
+--- a/meson.build
++++ b/meson.build
+@@ -46,6 +46,7 @@ gio_dep = dependency('gio-2.0', version: '>= 2.76')
+ gudev_dep = dependency('gudev-1.0', version: '>= 237')
+ polkit_gobject_dep = dependency('polkit-gobject-1', version: '>= 0.91')
+ polkit_policy_directory = polkit_gobject_dep.get_pkgconfig_variable('policydir')
++libssc_dep = dependency('libssc', version: '>=0.2.1', required: get_option('ssc-support'))
+ 
+ xmllint = find_program('xmllint', required: false)
+ 
+diff --git a/meson_options.txt b/meson_options.txt
+index de5fbf4..b0dee40 100644
+--- a/meson_options.txt
++++ b/meson_options.txt
+@@ -18,6 +18,10 @@ option('geoclue-user',
+        description: 'The USER (existing) as which geoclue service is running',
+        type: 'string',
+        value: 'geoclue')
++option('ssc-support',
++       description: 'Enable Qualcomm SSC support',
++       type: 'feature',
++       value: 'auto')
+ option('gtk_doc',
+        type: 'boolean',
+        value: false,
+diff --git a/src/iio-sensor-proxy.c b/src/iio-sensor-proxy.c
+index 2865882..3bde650 100644
+--- a/src/iio-sensor-proxy.c
++++ b/src/iio-sensor-proxy.c
+@@ -128,6 +128,11 @@ find_sensors (GUdevClient *client,
+ 	platform = g_udev_client_query_by_subsystem (client, "platform");
+ 	devices = g_list_concat (devices, input);
+ 	devices = g_list_concat (devices, platform);
++#ifdef HAS_LIBSSC
++	GList *fastrpc;
++	fastrpc = g_udev_client_query_by_subsystem (client, "misc");
++	devices = g_list_concat (devices, fastrpc);
++#endif
+ 
+ 	/* Find the devices */
+ 	for (l = devices; l != NULL; l = l->next) {
+@@ -727,7 +732,15 @@ name_acquired_handler (GDBusConnection *connection,
+ 		       gpointer         user_data)
+ {
+ 	SensorData *data = user_data;
+-	const gchar * const subsystems[] = { "iio", "input", "platform", NULL };
++	const gchar * const subsystems[] = {
++		"iio",
++		"input",
++		"platform",
++#ifdef HAS_LIBSSC
++		"misc",
++#endif
++		NULL
++    };
+ 	guint i;
+ 
+ 	data->client = g_udev_client_new (subsystems);
+diff --git a/src/meson.build b/src/meson.build
+index 4b822fc..aabe567 100644
+--- a/src/meson.build
++++ b/src/meson.build
+@@ -1,5 +1,8 @@
+ config_h = configuration_data()
+ config_h.set_quoted('VERSION', meson.project_version())
++if get_option('ssc-support').enabled()
++  config_h.set_quoted('HAS_LIBSSC', '1')
++endif
+ config_h_files = configure_file(
+   output: 'config.h',
+   configuration: config_h
+@@ -7,6 +10,10 @@ config_h_files = configure_file(
+ 
+ deps = [ gio_dep, gudev_dep, mathlib_dep, polkit_gobject_dep ]
+ 
++if get_option('ssc-support').enabled()
++  deps = deps + [ libssc_dep ]
++endif
++
+ resources = gnome.compile_resources(
+     'iio-sensor-proxy-resources', 'iio-sensor-proxy.gresource.xml',
+     c_name: 'iio_sensor_proxy',
+-- 
+2.52.0
+

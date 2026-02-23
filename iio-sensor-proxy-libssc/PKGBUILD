@@ -3,21 +3,65 @@
 # Contributor: Thomas Fanninger <thomas@fanninger.at>
 # Contributor: ultraviolet <ultravioletnanokitty@gmail.com>
 # Contributor: Pablo Lezeta <prflr88@gmail.com>
+
 pkgname=iio-sensor-proxy-libssc
 pkgver=3.8
 pkgrel=3
 pkgdesc='IIO accelerometer sensor to input device proxy'
 arch=('x86_64' 'aarch64')
 url='https://gitlab.freedesktop.org/hadess/iio-sensor-proxy/'
-license=('GPL2')
-depends=('systemd' 'libgudev' 'glib2' 'polkit' 'libssc')
+license=('GPL-2.0-or-later')
+depends=('systemd' 'libgudev' 'glib2' 'polkit' 'libssc' 'dbus')
 makedepends=('gtk3' 'meson')
 checkdepends=('python-gobject' 'python-dbusmock' 'python-psutil' 'umockdev')
 # https://gitlab.freedesktop.org/hadess/iio-sensor-proxy/-/archive/ssc/iio-sensor-proxy-ssc.tar.gz
 #_branch=ssc
 _pkgname=iio-sensor-proxy
-source=("$url/-/archive/$pkgver/$_pkgname-$pkgver.tar.gz")
-sha512sums=('9cca8d706c531c9a2e34dfebdc8673a1765b615533e3f7776118c74cb1ce145e472203c6c7804d35701c22cc93755609829bc3817c5920d5961249d7e8de87c6')
+
+source=(
+  "$url/-/archive/$pkgver/$_pkgname-$pkgver.tar.gz"
+	"system-iio-sensor-proxy.service.d-hexagonrpcd.conf"
+	"0001-iio-sensor-proxy-depend-on-libssc.patch"
+	"0002-proximity-support-SSC-proximity-sensor.patch"
+	"0003-light-support-SSC-light-sensor.patch"
+	"0004-accelerometer-support-SSC-accelerometer-sensor.patch"
+	"0005-compass-support-SSC-compass-sensor.patch"
+	"0006-data-iio-sensor-proxy.service.in-add-AF_QIPCRTR.patch"
+	"0007-drv-ssc-implement-set_polling.patch"
+	"0008-tests-integration-test-add-SSC-sensors.patch"
+	"0009-CI-add-libssc-build.patch"
+	"0010-ssc-Simplify-sensor-handling.patch"
+	"0001-WIP-iio-sensor-proxy.c-Do-not-exit-based-on-sensor-e.patch"
+	"0013-integration-test-add-test-for-sensors-that-report-no.patch"
+	"0001-iio-sensor-proxy-register-DBus-objects-after-client-.patch"
+)
+sha512sums=(
+  '9cca8d706c531c9a2e34dfebdc8673a1765b615533e3f7776118c74cb1ce145e472203c6c7804d35701c22cc93755609829bc3817c5920d5961249d7e8de87c6'
+  '2e8a876b61093add48e0677dcbfdac148690eddb398ff51ab4edb6547515ad8f8cfec31e8fda6886746b3bf30410b7b63c7486dcfe2441a7e742ea5023981a45'
+  '0d8b434af801a769ea4663d12f5eecde18d6c1d52f12e3fe82925c0b79ed984ec61c7da6aeef29d64f02376bd0b28f0231e197f6838c3e96d27cdff584d5773a'
+  'be3b86a6d7d331e4c388f4aa028fd3d74a4c9817fcd0fbcc1a4ab98658694cb0d9890b612927ffc6fa8f93ae5fa0c8e8afb4a89eac261643bd5e81bbce4d98d1'
+  'cbd22a15a21de58cf0c8d558274351590b794488c79d67ecd68d666155e2eff279ee4c7c823eb5899eb4c39a0ce6d075f94865302ccc212a0072b36efca28d4f'
+  '197a9d87e4565eb1749e004e32d43ab0b3c7e1e2b1c887d8caa8b954e9f26a67fa473a0b4e7e14ccfea92860461df8524f6d3412354d8195e7f6397f2622e0bb'
+  '92b5311eb2bd3da94ae49a14134e7d808ae447122f6a61e2ecb3439b82206771f7d756e9b38441217abb5a9f24abf4e5881ea786ac29e05356f15a414a26f859'
+  'cb66a401478b03afd85d0bbcd5f71fccadeb1a7f42c58d5fb8d7cfa852aefdf75d30c8b9f05eef1dfaffa26076618d94791d59be3aecff9c617dc1ce76dc0062'
+  'd0ff2da84fbdb513bd3ff3688292243247df7302ae34c1aea3158201034acf32aea8cf9b2df784a2f85dd8e5c3631ac8d25c99f3aa0b1a76b39882695633bd6f'
+  'ad69800ee5b4c11cf349b0920aaa02e7cee9711929d980b46d8f56da801c1f7a791ed3212ad0ac0f24f7d2900c82e8040ed9fa2778a7169562fd00599ed5287c'
+  'd1e88b382fb62fb1a5b28c1e2fae7cdeaab8cce9fcdc20400a596cb7e273c5e162d04fa5a5ed4abb1684eaa8f281b0f9658f713402a24271d7af910ac9dd62f9'
+  '39fd54fab1ffe3d1abf61f5fa8c64f9983ab4fa527951f43dc59c96fa49007a039a3a5ff40a91e6c5a8c048f1ab47c60b292abccae4f86b5b5691e0eb25d61f5'
+  '4b43ea53b71c9be29367897a3c9ba349e9fdb71185300aafc00be69f923d7f27aa02bb7f0f5c5be800f0d494035992e046c010fd70a1754f8a47701b17666926'
+  '9273f01d35e0f45ddc943808326d87f3a2e678ea29e607d3d70cabc9ea321db761cc170a86b3093553a4c3dfae1d81c5057d146b9a90ff490c85641f02b040df'
+  'f359446a327bf44e64394b446c9bccf906e74e4913eb365f7c4492fe299b33e84a29f3833f70216a593c105081065eba54aa58636415bf90015dd7c0c2e43d04'
+)
+
+prepare() {
+  cd $_pkgname-$pkgver
+
+  for p in ../*.patch; do
+    [[ -f "$p" ]] || continue
+    echo "Applying patch: $p"
+    patch -Np1 -i "$p"
+  done
+}
 
 build() {
   mkdir $_pkgname-$pkgver/build
@@ -25,17 +69,14 @@ build() {
 
   arch-meson .. \
     -Dsystemdsystemunitdir=/usr/lib/systemd/system \
-    -Dudevrulesdir=/usr/lib/udev/rules.d \
-    -Dsysconfdir=/usr/share
+    -Db_lto=true \
+		-Dssc-support=enabled
 
   ninja
 }
 
 check() {
   cd $_pkgname-$pkgver/build
-
-#  needs French locale
-#  ninja test
 }
 
 package() {
@@ -45,6 +86,10 @@ package() {
   cd $_pkgname-$pkgver/build
    
   DESTDIR="$pkgdir" ninja install
+
+  # Make iio-sensor-proxy depend on hexagonrpcd
+  install -Dm644 "$srcdir"/system-iio-sensor-proxy.service.d-hexagonrpcd.conf \
+		"$pkgdir"/usr/lib/systemd/system/iio-sensor-proxy.service.d/hexagonrpcd.conf
 
   # Add override for it to always restart
   install -d "$pkgdir/etc/systemd/system/iio-sensor-proxy.service.d"
