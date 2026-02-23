@@ -3,17 +3,18 @@
 pkgname=libssc
 pkgdesc="Library to expose Qualcomm Sensor Core sensors"
 pkgver=0.4.0.r2.g749be3d
-pkgrel=2
+pkgrel=3
 _arches=specific
 arch=(any)
 license=(GPL-3.0-or-later)
 url=https://codeberg.org/DylanVanAssche/libssc
-provides=(liblibssc.so)
+provides=(liblibssc.so.2)
 depends=(
     "libqmi>=1.33.4"
     "glib2>=2.56"
     protobuf-c
     gobject-introspection
+    libqrtr-glib
 )
 makedepends=(
     linux-headers
@@ -34,7 +35,7 @@ prepare() {
 }
 
 build() {
-    arch-meson libssc build
+    arch-meson -Db_lto=true libssc build
     meson compile -C build
 }
 
