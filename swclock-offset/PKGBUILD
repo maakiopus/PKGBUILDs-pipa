@@ -1,0 +1,38 @@
+# Maintainer: Jakko <jahau@rocketmail.com>
+
+pkgname=swclock-offset
+pkgver=0.3.0
+pkgrel=1
+pkgdesc="Keep system time at an offset to a non-writable RTC"
+arch=('any')
+url="https://gitlab.postmarketos.org/postmarketOS/swclock-offset"
+license=('GPL-3.0-or-later')
+source=("https://gitlab.postmarketos.org/postmarketOS/$pkgname/-/archive/$pkgver/$pkgname-$pkgver.tar.gz")
+sha512sums=('7779deaf688dd25b9abe8161c8a0651d11b1a44785ff4495a1c4a8b9ba2108a9e73c47cbdb3f8669c4e2e85bea884145f66311c9ce674c1464538695a9852dc0')
+
+package() {
+	cd "$srcdir/$pkgname-$pkgver"
+	
+	sed -e 's+STORAGE_PATH+/var/cache+g' src/$pkgname-boot.sh.in > src/$pkgname-boot.sh
+	sed -e 's+STORAGE_PATH+/var/cache+g' src/$pkgname-shutdown.sh.in > src/$pkgname-shutdown.sh
+
+    sed -e 's+SWCLOCK_PATH+/usr/bin+g' systemd/$pkgname-boot.service.in > systemd/$pkgname-boot.service
+	sed -e 's+SWCLOCK_PATH+/usr/bin+g' systemd/$pkgname-shutdown.service.in > systemd/$pkgname-shutdown.service
+
+	# Install main binary
+	install -Dm755 src/$pkgname-boot.sh \
+		"$pkgdir/usr/bin/$pkgname-boot"
+
+	install -Dm755 src/$pkgname-shutdown.sh \
+		"$pkgdir/usr/bin/$pkgname-shutdown"
+
+	# Install systemd service
+    install -Dm644 systemd/$pkgname.target \
+		"$pkgdir/usr/lib/systemd/system/$pkgname.target"
+
+	install -Dm644 systemd/$pkgname-boot.service \
+		"$pkgdir/usr/lib/systemd/system/$pkgname-boot"
+
+	install -Dm644 systemd/$pkgname-shutdown.service  \
+		"$pkgdir/usr/lib/systemd/system/$pkgname-shutdown"
+}
