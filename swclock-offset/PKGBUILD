@@ -2,7 +2,7 @@
 
 pkgname=swclock-offset
 pkgver=0.3.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Keep system time at an offset to a non-writable RTC"
 arch=('any')
 url="https://gitlab.postmarketos.org/postmarketOS/swclock-offset"
@@ -32,8 +32,8 @@ package() {
 		"$pkgdir/usr/lib/systemd/system/$pkgname.target"
 
 	install -Dm644 systemd/$pkgname-boot.service \
-		"$pkgdir/usr/lib/systemd/system/$pkgname-boot"
+		"$pkgdir/usr/lib/systemd/system/$pkgname-boot.service"
 
 	install -Dm644 systemd/$pkgname-shutdown.service  \
-		"$pkgdir/usr/lib/systemd/system/$pkgname-shutdown"
+		"$pkgdir/usr/lib/systemd/system/$pkgname-shutdown.service"
 }
