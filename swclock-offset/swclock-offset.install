@@ -21,10 +21,10 @@ post_remove() {
     offset_directory="/var/cache/swclock-offset"
 
     if [ -f $offset_file ]; then
-    rm $offset_file
+        rm $offset_file
     fi
 
     if [ -d $offset_directory ]; then
-    rmdir $offset_directory
+        rmdir $offset_directory
     fi
 }
