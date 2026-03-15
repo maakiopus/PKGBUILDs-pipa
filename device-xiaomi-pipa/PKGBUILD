@@ -1,7 +1,7 @@
 pkgname=device-xiaomi-pipa
 pkgdesc="Package containing configurations for Xiaomi Pad 6"
 pkgver=3
-pkgrel=6
+pkgrel=7
 url="https://postmarketos.org"
 license=('MIT')
 arch=('aarch64')
@@ -48,6 +48,9 @@ package() {
 	# /usr/share/alsa/ucm2/Qualcomm/sm8250/HiFi_pipa.conf
 	mkdir -p "${pkgdir}/usr/share/alsa/ucm2/Qualcomm/sm8250/"
 	install -Dm644 "${srcdir}/hifi.conf" "${pkgdir}/usr/share/alsa/ucm2/Qualcomm/sm8250/HiFi_pipa.conf"
+
+	# /usr/share/alsa/ucm2/Qualcomm/sm8250/Xiaomi-Pad6-pipa-M82.conf
+	ln -s "${pkgdir}/usr/share/alsa/ucm2/conf.d/sm8250/Xiaomi Pad 6.conf" "${pkgdir}/usr/share/alsa/ucm2/conf.d/sm8250/Xiaomi-Pad6-pipa-M82.conf"
 
 	# /usr/share/wireplumber.conf.d/51-pipa.conf
 	mkdir -p "${pkgdir}/usr/share/wireplumber/wireplumber.conf.d"
